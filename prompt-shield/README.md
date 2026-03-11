@@ -2,7 +2,7 @@
 
 > **LLM Prompt Injection Defense Middleware** — A four-layer architecture for detecting, neutralizing, and monitoring prompt injection attacks against LLM-powered applications.
 
-Built for the **Cybersecurity Hackathon** by Shillah.
+Built for the **Cybersecurity Hackathon** by Noel.
 
 ---
 
