@@ -72,7 +72,7 @@ class OutputMonitor:
             # SSN
             (r'\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b', 0.8, "Potential SSN"),
             # API keys (generic)
-            (r'\b(sk|pk|api|key|token)[_-]?[a-zA-Z0-9]{20,}\b', 0.75, "Potential API key"),
+            (r'\b(sk|pk)[_-](live|test|ant)[_-]?[a-zA-Z0-9]{10,}\b|\b(sk|pk|api|key|token)[_-]?[a-zA-Z0-9]{20,}\b', 0.75, "Potential API key"),
             # Passwords in output
             (r'(password|passwd|secret)\s*[:=]\s*\S+', 0.85, "Potential credential"),
         ]

@@ -49,7 +49,7 @@ INJECTION_PATTERNS = [
     (r"(output|print|repeat) (everything|all) (above|before|prior)", 0.8),
 
     # Delimiter/injection attacks
-    (r"```\s*(system|user|assistant)\s*\n", 0.85),
+    (r"```\s*(system|user|assistant|instruction)", 0.85),
     (r"<(system|user|assistant|instruction)>", 0.8),
     (r"\[INST\]|\[/INST\]|<<SYS>>|<</SYS>>", 0.85),
     (r"###\s*(instruction|system|override)", 0.8),

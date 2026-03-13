@@ -129,9 +129,8 @@ class PromptIntegrityChecker:
         
         # Check nothing suspicious is injected between the delimiters and the actual content
         # that could be mistaken for system instructions in the assembled prompt
-        inner = user.replace("--- BEGIN USER INPUT ---", "").replace("--- END USER INPUT ---", "").strip()
-        
-        if "--- BEGIN USER INPUT ---" in inner or "--- END USER INPUT ---" in inner:
+        inner = user.replace("--- BEGIN USER INPUT ---", "", 1).strip()
+        if "--- BEGIN USER INPUT ---" in inner:
             return False, "Nested safe-wrap delimiters detected — possible injection"
         
         return True, "Boundary enforcement passed"
