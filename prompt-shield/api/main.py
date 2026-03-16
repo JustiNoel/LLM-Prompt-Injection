@@ -16,9 +16,10 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from middleware import PromptShield, ShieldConfig
 from middleware.shield import AggressionLevel
-import sys, os
+
 sys.path.insert(0, os.path.dirname(__file__))
-from auth import require_api_key  # ← NEW
+from auth import require_api_key
+from rate_limiter import check_rate_limit  # ← NEW
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("prompt_shield.api")
@@ -30,7 +31,9 @@ app = FastAPI(
         "LLM Prompt Injection Defense Middleware — 4-layer protection "
         "with configurable aggression.\n\n"
         "**Authentication:** All endpoints except `/`, `/health`, and `/docs` "
-        "require an `X-API-Key` header."
+        "require an `X-API-Key` header.\n\n"
+        "**Rate Limiting:** Requests are limited per API key. "
+        "Exceeding the limit returns `429 Too Many Requests`."
     ),
 )
 app.add_middleware(
@@ -66,7 +69,6 @@ shield = PromptShield(config=config)
 shield.register_system_prompt("default", SYSTEM_PROMPT)
 
 
-# ── Gemini Client ─────────────────────────────────────────────
 def get_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
@@ -84,7 +86,6 @@ async def call_llm(system_prompt: str, user_input: str) -> str:
     return response.text
 
 
-# ── Models ────────────────────────────────────────────────────
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
@@ -118,7 +119,6 @@ class AggressionRequest(BaseModel):
     level: str
 
 
-# ── Public Routes (no auth required) ─────────────────────────
 @app.get("/", tags=["Public"])
 async def root():
     return {
@@ -149,11 +149,11 @@ async def health():
     }
 
 
-# ── Protected Routes (API key required) ──────────────────────
 @app.post("/chat", response_model=ChatResponse, tags=["Protected"])
 async def chat(
     req: ChatRequest,
-    _: str = Depends(require_api_key),   # ← auth enforced here
+    _auth: str = Depends(require_api_key),
+    _rate: None = Depends(check_rate_limit),
 ):
     result = await shield.process(
         user_input=req.message,
@@ -181,7 +181,8 @@ async def chat(
 @app.post("/analyze", response_model=AnalyzeResponse, tags=["Protected"])
 async def analyze(
     req: AnalyzeRequest,
-    _: str = Depends(require_api_key),   # ← auth enforced here
+    _auth: str = Depends(require_api_key),
+    _rate: None = Depends(check_rate_limit),
 ):
     l1 = shield.layer1.classify(req.text)
     l2 = shield.layer2.sanitize(req.text)
@@ -198,7 +199,8 @@ async def analyze(
 @app.post("/aggression", tags=["Protected"])
 async def set_aggression(
     req: AggressionRequest,
-    _: str = Depends(require_api_key),   # ← auth enforced here
+    _auth: str = Depends(require_api_key),
+    _rate: None = Depends(check_rate_limit),
 ):
     level = _aggression_map.get(req.level.lower())
     if not level:
@@ -221,7 +223,8 @@ async def set_aggression(
 
 @app.get("/stats", tags=["Protected"])
 async def stats(
-    _: str = Depends(require_api_key),   # ← auth enforced here
+    _auth: str = Depends(require_api_key),
+    _rate: None = Depends(check_rate_limit),
 ):
     cfg = shield._cfg
     return {
