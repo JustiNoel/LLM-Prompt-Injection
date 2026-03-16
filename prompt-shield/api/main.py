@@ -16,6 +16,8 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from middleware import PromptShield, ShieldConfig
 from middleware.shield import AggressionLevel
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
 from auth import require_api_key  # ← NEW
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
