@@ -5,7 +5,7 @@ Uses Google Gemini (new google-genai SDK) as the LLM backend.
 import os
 import sys
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -16,13 +16,27 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from middleware import PromptShield, ShieldConfig
 from middleware.shield import AggressionLevel
+from auth import require_api_key  # ← NEW
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("prompt_shield.api")
 
-app = FastAPI(title="PromptShield API", version="1.0.0",
-              description="LLM Prompt Injection Defense Middleware — 4-layer protection with configurable aggression")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(
+    title="PromptShield API",
+    version="1.0.0",
+    description=(
+        "LLM Prompt Injection Defense Middleware — 4-layer protection "
+        "with configurable aggression.\n\n"
+        "**Authentication:** All endpoints except `/`, `/health`, and `/docs` "
+        "require an `X-API-Key` header."
+    ),
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SYSTEM_PROMPT = """You are a helpful AI assistant called PromptShield Demo.
 You are helpful, concise, and honest.
@@ -49,12 +63,14 @@ config = ShieldConfig(
 shield = PromptShield(config=config)
 shield.register_system_prompt("default", SYSTEM_PROMPT)
 
-# ── Gemini Client (new SDK) ───────────────────────────────────
+
+# ── Gemini Client ─────────────────────────────────────────────
 def get_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
     return genai.Client(api_key=api_key)
+
 
 async def call_llm(system_prompt: str, user_input: str) -> str:
     client = get_gemini_client()
@@ -100,8 +116,8 @@ class AggressionRequest(BaseModel):
     level: str
 
 
-# ── Routes ────────────────────────────────────────────────────
-@app.get("/")
+# ── Public Routes (no auth required) ─────────────────────────
+@app.get("/", tags=["Public"])
 async def root():
     return {
         "name": "PromptShield",
@@ -112,24 +128,31 @@ async def root():
             "1": "Input Classification",
             "2": "Context Sanitization",
             "3": "Prompt Integrity",
-            "4": "Output Monitoring"
+            "4": "Output Monitoring",
         },
         "docs": "/docs",
         "health": "/health",
+        "auth": "Include X-API-Key header for protected endpoints.",
     }
 
-@app.get("/health")
+
+@app.get("/health", tags=["Public"])
 async def health():
     return {
         "status": "ok",
         "service": "PromptShield",
         "layers_active": 4,
         "aggression": shield.config.aggression.value,
-        "llm_backend": "gemini-1.5-flash",
+        "llm_backend": "Google Gemini 2.5 Flash",
     }
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
+
+# ── Protected Routes (API key required) ──────────────────────
+@app.post("/chat", response_model=ChatResponse, tags=["Protected"])
+async def chat(
+    req: ChatRequest,
+    _: str = Depends(require_api_key),   # ← auth enforced here
+):
     result = await shield.process(
         user_input=req.message,
         llm_fn=call_llm,
@@ -152,8 +175,12 @@ async def chat(req: ChatRequest):
         aggression_level=result.aggression_level,
     )
 
-@app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(req: AnalyzeRequest):
+
+@app.post("/analyze", response_model=AnalyzeResponse, tags=["Protected"])
+async def analyze(
+    req: AnalyzeRequest,
+    _: str = Depends(require_api_key),   # ← auth enforced here
+):
     l1 = shield.layer1.classify(req.text)
     l2 = shield.layer2.sanitize(req.text)
     return AnalyzeResponse(
@@ -165,8 +192,12 @@ async def analyze(req: AnalyzeRequest):
         modifications=l2.modifications,
     )
 
-@app.post("/aggression")
-async def set_aggression(req: AggressionRequest):
+
+@app.post("/aggression", tags=["Protected"])
+async def set_aggression(
+    req: AggressionRequest,
+    _: str = Depends(require_api_key),   # ← auth enforced here
+):
     level = _aggression_map.get(req.level.lower())
     if not level:
         raise HTTPException(
@@ -182,15 +213,18 @@ async def set_aggression(req: AggressionRequest):
             "balanced":   "Block malicious only (default)",
             "strict":     "Block malicious + suspicious",
             "paranoid":   "Maximum security",
-        }
+        },
     }
 
-@app.get("/stats")
-async def stats():
+
+@app.get("/stats", tags=["Protected"])
+async def stats(
+    _: str = Depends(require_api_key),   # ← auth enforced here
+):
     cfg = shield._cfg
     return {
         "aggression_level": shield.config.aggression.value,
-        "llm_backend": "Google Gemini 1.5 Flash",
+        "llm_backend": "Google Gemini 2.5 Flash",
         "thresholds": {
             "suspicious":   cfg["suspicious_threshold"],
             "malicious":    cfg["malicious_threshold"],
@@ -201,5 +235,5 @@ async def stats():
             "block_on_malicious":  cfg["block_on_malicious"],
             "block_on_suspicious": cfg["block_on_suspicious"],
             "verify_integrity":    cfg["verify_integrity"],
-        }
+        },
     }
