@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptShield — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070b14;
+    --surface: #0d1526;
+    --border: #1a2a45;
+    --teal: #00d4aa;
+    --teal-dim: rgba(0,212,170,0.1);
+    --red: #ff4d6d;
+    --yellow: #ffd166;
+    --text: #e2eaf7;
+    --muted: #5a7494;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,212,170,0.07), transparent);
+    pointer-events:none;
+  }
+
+  /* ── Header ── */
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 1.5rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    position: sticky; top:0; z-index:10;
+    background: rgba(7,11,20,0.85);
+  }
+  .logo { display:flex; align-items:center; gap:.75rem; }
+  .logo-icon {
+    width:36px; height:36px; border-radius:8px;
+    background: linear-gradient(135deg, var(--teal), #0096ff);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.1rem;
+  }
+  .logo-text { font-size:1.2rem; font-weight:800; letter-spacing:-.02em; }
+  .logo-text span { color: var(--teal); }
+
+  .header-right { display:flex; align-items:center; gap:1rem; }
+  .api-input {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: .5rem 1rem;
+    border-radius: 8px; font-family:'JetBrains Mono', monospace;
+    font-size:.75rem; width:300px; outline:none;
+    transition: border-color .2s;
+  }
+  .api-input:focus { border-color: var(--teal); }
+  .btn {
+    background: var(--teal); color: #000; border:none;
+    padding:.5rem 1.2rem; border-radius:8px;
+    font-family:'Syne',sans-serif; font-weight:700;
+    font-size:.85rem; cursor:pointer; transition: opacity .2s;
+  }
+  .btn:hover { opacity:.85; }
+  .btn-outline {
+    background:transparent; color:var(--teal);
+    border:1px solid var(--teal);
+  }
+
+  /* ── Layout ── */
+  main { padding: 2rem 2.5rem; max-width: 1400px; margin:0 auto; }
+
+  /* ── Status bar ── */
+  .status-bar {
+    display:flex; align-items:center; gap:.6rem;
+    margin-bottom: 2rem;
+    font-family:'JetBrains Mono',monospace; font-size:.8rem;
+    color: var(--muted);
+  }
+  .status-dot {
+    width:8px; height:8px; border-radius:50%;
+    background: var(--muted);
+    transition: background .3s;
+  }
+  .status-dot.online { background: var(--teal); box-shadow: 0 0 8px var(--teal); animation: pulse 2s infinite; }
+  .status-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* ── Stats Grid ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.5rem;
+    position:relative; overflow:hidden;
+    transition: border-color .2s, transform .2s;
+  }
+  .stat-card:hover { border-color: var(--teal); transform: translateY(-2px); }
+  .stat-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, var(--teal), transparent);
+    opacity:0; transition: opacity .2s;
+  }
+  .stat-card:hover::before { opacity:1; }
+  .stat-label {
+    font-size:.72rem; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.1em; margin-bottom:.75rem;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .stat-value {
+    font-size:2.2rem; font-weight:800; line-height:1;
+    margin-bottom:.25rem;
+  }
+  .stat-sub { font-size:.75rem; color:var(--muted); }
+  .teal { color: var(--teal); }
+  .red  { color: var(--red); }
+  .yellow { color: var(--yellow); }
+
+  /* ── Threat Bar ── */
+  .threat-section {
+    background: var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:1.5rem; margin-bottom:2rem;
+  }
+  .section-title {
+    font-size:.8rem; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.1em; font-family:'JetBrains Mono',monospace;
+    margin-bottom:1.25rem;
+  }
+  .threat-bars { display:flex; flex-direction:column; gap:.75rem; }
+  .threat-row { display:flex; align-items:center; gap:1rem; }
+  .threat-name { font-size:.8rem; width:80px; font-family:'JetBrains Mono',monospace; }
+  .threat-bar-bg {
+    flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden;
+  }
+  .threat-bar-fill {
+    height:100%; border-radius:4px;
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+  }
+  .bar-safe { background: var(--teal); }
+  .bar-suspicious { background: var(--yellow); }
+  .bar-malicious { background: var(--red); }
+  .threat-count { font-size:.8rem; color:var(--muted); width:40px; text-align:right; font-family:'JetBrains Mono',monospace; }
+
+  /* ── Logs Table ── */
+  .logs-section {
+    background: var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:1.5rem;
+  }
+  .logs-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; }
+  .log-table { width:100%; border-collapse:collapse; }
+  .log-table th {
+    font-size:.7rem; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.08em; font-family:'JetBrains Mono',monospace;
+    padding:.5rem .75rem; text-align:left; border-bottom:1px solid var(--border);
+    font-weight:400;
+  }
+  .log-table td {
+    padding:.65rem .75rem; font-size:.78rem;
+    font-family:'JetBrains Mono',monospace;
+    border-bottom:1px solid rgba(26,42,69,0.5);
+    color: var(--text);
+  }
+  .log-table tr:hover td { background: rgba(0,212,170,0.03); }
+  .badge {
+    display:inline-block; padding:.2rem .5rem;
+    border-radius:4px; font-size:.68rem; font-weight:600;
+  }
+  .badge-safe { background:rgba(0,212,170,0.1); color:var(--teal); }
+  .badge-suspicious { background:rgba(255,209,102,0.1); color:var(--yellow); }
+  .badge-malicious { background:rgba(255,77,109,0.1); color:var(--red); }
+  .badge-blocked { background:rgba(255,77,109,0.15); color:var(--red); }
+  .badge-allowed { background:rgba(0,212,170,0.1); color:var(--teal); }
+
+  /* ── Empty / Error states ── */
+  .empty {
+    text-align:center; padding:3rem; color:var(--muted);
+    font-family:'JetBrains Mono',monospace; font-size:.85rem;
+  }
+  .error-msg {
+    background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.2);
+    color:var(--red); padding:1rem 1.5rem; border-radius:8px;
+    font-family:'JetBrains Mono',monospace; font-size:.8rem;
+    margin-bottom:1.5rem; display:none;
+  }
+  #loading { text-align:center; padding:4rem; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div class="logo-text">Prompt<span>Shield</span></div>
+  </div>
+  <div class="header-right">
+    <input class="api-input" id="apiKey" type="password" placeholder="Enter your X-API-Key..." />
+    <button class="btn" onclick="loadDashboard()">Connect</button>
+    <button class="btn btn-outline" onclick="autoRefresh()">Auto Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Enter your API key to connect</span>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div id="loading" style="display:none">
+    <p>Fetching data from PromptShield...</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid" id="statsGrid" style="display:none">
+    <div class="stat-card">
+      <div class="stat-label">Total Requests</div>
+      <div class="stat-value teal" id="totalReqs">—</div>
+      <div class="stat-sub">Since last deploy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Allowed</div>
+      <div class="stat-value teal" id="allowedReqs">—</div>
+      <div class="stat-sub">Passed all layers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Blocked</div>
+      <div class="stat-value red" id="blockedReqs">—</div>
+      <div class="stat-sub">Threats stopped</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Block Rate</div>
+      <div class="stat-value yellow" id="blockRate">—</div>
+      <div class="stat-sub">Of all requests</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Response</div>
+      <div class="stat-value" id="avgMs">—</div>
+      <div class="stat-sub">Milliseconds</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Threats Found</div>
+      <div class="stat-value red" id="threatsFound">—</div>
+      <div class="stat-sub">Suspicious + malicious</div>
+    </div>
+  </div>
+
+  <!-- Threat Breakdown -->
+  <div class="threat-section" id="threatSection" style="display:none">
+    <div class="section-title">Threat Breakdown</div>
+    <div class="threat-bars">
+      <div class="threat-row">
+        <span class="threat-name teal">Safe</span>
+        <div class="threat-bar-bg"><div class="threat-bar-fill bar-safe" id="barSafe" style="width:0%"></div></div>
+        <span class="threat-count" id="countSafe">0</span>
+      </div>
+      <div class="threat-row">
+        <span class="threat-name yellow">Suspicious</span>
+        <div class="threat-bar-bg"><div class="threat-bar-fill bar-suspicious" id="barSuspicious" style="width:0%"></div></div>
+        <span class="threat-count" id="countSuspicious">0</span>
+      </div>
+      <div class="threat-row">
+        <span class="threat-name red">Malicious</span>
+        <div class="threat-bar-bg"><div class="threat-bar-fill bar-malicious" id="barMalicious" style="width:0%"></div></div>
+        <span class="threat-count" id="countMalicious">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logs -->
+  <div class="logs-section" id="logsSection" style="display:none">
+    <div class="logs-header">
+      <div class="section-title" style="margin:0">Recent Audit Trail</div>
+      <button class="btn btn-outline" style="font-size:.75rem; padding:.35rem .9rem" onclick="loadDashboard()">↻ Refresh</button>
+    </div>
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Session</th>
+          <th>API Key</th>
+          <th>Endpoint</th>
+          <th>Threat</th>
+          <th>Score</th>
+          <th>Status</th>
+          <th>Layer Blocked</th>
+          <th>Ms</th>
+        </tr>
+      </thead>
+      <tbody id="logsBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  const BASE = "https://prompt-shield.onrender.com";
+  let refreshTimer = null;
+
+  function getKey() {
+    return document.getElementById("apiKey").value.trim();
+  }
+
+  function setStatus(state, text) {
+    const dot = document.getElementById("statusDot");
+    const txt = document.getElementById("statusText");
+    dot.className = "status-dot " + state;
+    txt.textContent = text;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("errorMsg");
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+
+  function hideError() {
+    document.getElementById("errorMsg").style.display = "none";
+  }
+
+  async function fetchJSON(path) {
+    const res = await fetch(BASE + path, {
+      headers: { "X-API-Key": getKey() }
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+  }
+
+  async function loadDashboard() {
+    if (!getKey()) { showError("Please enter your API key first."); return; }
+    hideError();
+    setStatus("", "Connecting...");
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("statsGrid").style.display = "none";
+    document.getElementById("threatSection").style.display = "none";
+    document.getElementById("logsSection").style.display = "none";
+
+    try {
+      const [summary, logsData] = await Promise.all([
+        fetchJSON("/logs/summary"),
+        fetchJSON("/logs?limit=50"),
+      ]);
+
+      // Stats
+      document.getElementById("totalReqs").textContent    = summary.total_requests ?? 0;
+      document.getElementById("allowedReqs").textContent  = summary.allowed ?? 0;
+      document.getElementById("blockedReqs").textContent  = summary.blocked ?? 0;
+      document.getElementById("blockRate").textContent    = summary.block_rate ?? "0%";
+      document.getElementById("avgMs").textContent        = (summary.avg_processing_ms ?? 0) + "ms";
+      document.getElementById("threatsFound").textContent = summary.threats_detected ?? 0;
+
+      // Threat bars
+      const tb = summary.threat_breakdown || {};
+      const total = summary.total_requests || 1;
+      const safe  = tb.safe || 0;
+      const susp  = tb.suspicious || 0;
+      const mal   = tb.malicious || 0;
+      document.getElementById("barSafe").style.width       = (safe/total*100) + "%";
+      document.getElementById("barSuspicious").style.width = (susp/total*100) + "%";
+      document.getElementById("barMalicious").style.width  = (mal/total*100) + "%";
+      document.getElementById("countSafe").textContent       = safe;
+      document.getElementById("countSuspicious").textContent = susp;
+      document.getElementById("countMalicious").textContent  = mal;
+
+      // Logs table
+      const logs = (logsData.logs || []).reverse();
+      const tbody = document.getElementById("logsBody");
+      if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty">No requests logged yet.</td></tr>';
+      } else {
+        tbody.innerHTML = logs.map(l => {
+          const ts = new Date(l.timestamp).toLocaleTimeString();
+          const session = l.session_id ? l.session_id.slice(0,8) + "..." : "—";
+          const threat = `<span class="badge badge-${l.threat_level}">${l.threat_level}</span>`;
+          const status = l.blocked
+            ? `<span class="badge badge-blocked">BLOCKED</span>`
+            : `<span class="badge badge-allowed">ALLOWED</span>`;
+          return `<tr>
+            <td>${ts}</td>
+            <td>${session}</td>
+            <td>${l.api_key_hint || "—"}</td>
+            <td>${l.endpoint}</td>
+            <td>${threat}</td>
+            <td>${l.threat_score}</td>
+            <td>${status}</td>
+            <td>${l.blocked_at_layer !== null ? "Layer " + l.blocked_at_layer : "—"}</td>
+            <td>${l.processing_ms}</td>
+          </tr>`;
+        }).join("");
+      }
+
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("statsGrid").style.display = "grid";
+      document.getElementById("threatSection").style.display = "block";
+      document.getElementById("logsSection").style.display = "block";
+      setStatus("online", "Connected · Last updated " + new Date().toLocaleTimeString());
+
+    } catch(e) {
+      document.getElementById("loading").style.display = "none";
+      setStatus("error", "Connection failed");
+      showError("Error: " + e.message + " — Check your API key and try again.");
+    }
+  }
+
+  function autoRefresh() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+      setStatus("online", "Auto-refresh stopped");
+    } else {
+      loadDashboard();
+      refreshTimer = setInterval(loadDashboard, 10000);
+      setStatus("online", "Auto-refreshing every 10s...");
+    }
+  }
+</script>
+</body>
+</html>
