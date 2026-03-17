@@ -53,6 +53,7 @@ INJECTION_PATTERNS = [
     (r"<(system|user|assistant|instruction)>", 0.8),
     (r"\[INST\]|\[/INST\]|<<SYS>>|<</SYS>>", 0.85),
     (r"###\s*(instruction|system|override)", 0.8),
+    (r"new instructions?\s*[:]\s*.{0,50}", 0.85),
 
     # Encoding/obfuscation tricks
     (r"base64\s*(decode|encoded?)", 0.7),
