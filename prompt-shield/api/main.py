@@ -5,7 +5,7 @@ Uses Google Gemini (new google-genai SDK) as the LLM backend.
 import os
 import sys
 import logging
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -19,7 +19,8 @@ from middleware.shield import AggressionLevel
 
 sys.path.insert(0, os.path.dirname(__file__))
 from auth import require_api_key
-from rate_limiter import check_rate_limit  # ← NEW
+from rate_limiter import check_rate_limit
+from audit import log_request, get_recent_logs, get_summary  # ← NEW
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("prompt_shield.api")
@@ -30,10 +31,8 @@ app = FastAPI(
     description=(
         "LLM Prompt Injection Defense Middleware — 4-layer protection "
         "with configurable aggression.\n\n"
-        "**Authentication:** All endpoints except `/`, `/health`, and `/docs` "
-        "require an `X-API-Key` header.\n\n"
-        "**Rate Limiting:** Requests are limited per API key. "
-        "Exceeding the limit returns `429 Too Many Requests`."
+        "**Authentication:** Protected endpoints require `X-API-Key` header.\n\n"
+        "**Rate Limiting:** Returns `429` when limit is exceeded."
     ),
 )
 app.add_middleware(
@@ -119,6 +118,7 @@ class AggressionRequest(BaseModel):
     level: str
 
 
+# ── Public Routes ─────────────────────────────────────────────
 @app.get("/", tags=["Public"])
 async def root():
     return {
@@ -134,7 +134,6 @@ async def root():
         },
         "docs": "/docs",
         "health": "/health",
-        "auth": "Include X-API-Key header for protected endpoints.",
     }
 
 
@@ -149,10 +148,11 @@ async def health():
     }
 
 
+# ── Protected Routes ──────────────────────────────────────────
 @app.post("/chat", response_model=ChatResponse, tags=["Protected"])
 async def chat(
     req: ChatRequest,
-    _auth: str = Depends(require_api_key),
+    api_key: str = Depends(require_api_key),
     _rate: None = Depends(check_rate_limit),
 ):
     result = await shield.process(
@@ -161,6 +161,22 @@ async def chat(
         system_prompt=SYSTEM_PROMPT,
         system_prompt_name="default",
         session_id=req.session_id,
+    )
+    # ── Audit log ──
+    log_request(
+        session_id=result.session_id,
+        api_key=api_key,
+        endpoint="/chat",
+        allowed=result.allowed,
+        threat_level=result.layer1_threat,
+        threat_score=result.layer1_score,
+        blocked_at_layer=result.blocked_at_layer,
+        block_reason=result.block_reason,
+        input_modified=result.layer2_modified,
+        layer3_passed=result.layer3_passed,
+        layer4_risk=result.layer4_risk,
+        processing_ms=result.processing_ms,
+        aggression_level=result.aggression_level,
     )
     return ChatResponse(
         response=result.safe_output,
@@ -181,11 +197,26 @@ async def chat(
 @app.post("/analyze", response_model=AnalyzeResponse, tags=["Protected"])
 async def analyze(
     req: AnalyzeRequest,
-    _auth: str = Depends(require_api_key),
+    api_key: str = Depends(require_api_key),
     _rate: None = Depends(check_rate_limit),
 ):
     l1 = shield.layer1.classify(req.text)
     l2 = shield.layer2.sanitize(req.text)
+    log_request(
+        session_id="analyze",
+        api_key=api_key,
+        endpoint="/analyze",
+        allowed=True,
+        threat_level=l1.threat_level.value,
+        threat_score=l1.score,
+        blocked_at_layer=None,
+        block_reason=None,
+        input_modified=l2.was_modified,
+        layer3_passed=True,
+        layer4_risk="clean",
+        processing_ms=0,
+        aggression_level=shield.config.aggression.value,
+    )
     return AnalyzeResponse(
         threat_level=l1.threat_level.value,
         score=l1.score,
@@ -242,3 +273,24 @@ async def stats(
             "verify_integrity":    cfg["verify_integrity"],
         },
     }
+
+
+# ── Audit Routes ──────────────────────────────────────────────
+@app.get("/logs", tags=["Audit"])
+async def get_logs(
+    limit: int = Query(default=50, le=1000),
+    _auth: str = Depends(require_api_key),
+):
+    """View recent request audit trail."""
+    return {
+        "logs": get_recent_logs(limit=limit),
+        "count": limit,
+    }
+
+
+@app.get("/logs/summary", tags=["Audit"])
+async def logs_summary(
+    _auth: str = Depends(require_api_key),
+):
+    """Summary stats — total requests, block rate, threat breakdown."""
+    return get_summary()
