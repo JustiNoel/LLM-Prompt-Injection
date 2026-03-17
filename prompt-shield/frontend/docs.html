@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptShield — Integration Docs</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#070b14; --surface:#0d1526; --border:#1a2a45;
+    --teal:#00d4aa; --red:#ff4d6d; --yellow:#ffd166;
+    --text:#e2eaf7; --muted:#5a7494;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;line-height:1.7;}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(0,212,170,0.06),transparent);pointer-events:none;}
+
+  header{padding:1.5rem 2.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.75rem;position:sticky;top:0;background:rgba(7,11,20,0.9);backdrop-filter:blur(10px);z-index:10;}
+  .logo-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--teal),#0096ff);display:flex;align-items:center;justify-content:center;}
+  .logo-text{font-size:1.1rem;font-weight:800;} .logo-text span{color:var(--teal);}
+
+  .layout{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+
+  nav{padding:2rem 1.5rem;border-right:1px solid var(--border);position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;}
+  nav a{display:block;padding:.4rem .75rem;border-radius:6px;font-size:.82rem;color:var(--muted);text-decoration:none;transition:all .15s;margin-bottom:.1rem;}
+  nav a:hover,nav a.active{color:var(--teal);background:rgba(0,212,170,0.08);}
+  nav .nav-group{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:1.25rem 0 .5rem .75rem;font-family:'JetBrains Mono',monospace;}
+
+  .content{padding:2.5rem 3rem;max-width:860px;}
+  h1{font-size:2rem;font-weight:800;margin-bottom:.5rem;}
+  h2{font-size:1.2rem;font-weight:700;margin:2.5rem 0 1rem;padding-top:2.5rem;border-top:1px solid var(--border);}
+  h3{font-size:.95rem;font-weight:600;color:var(--teal);margin:1.5rem 0 .5rem;font-family:'JetBrains Mono',monospace;}
+  p{color:rgba(226,234,247,0.75);font-size:.9rem;margin-bottom:1rem;}
+
+  pre{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;overflow-x:auto;margin:1rem 0;}
+  code{font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--teal);}
+  pre code{color:var(--text);}
+  .kw{color:#79b8ff;} .str{color:#9ecbff;} .cm{color:var(--muted);}
+  .comment{color:var(--muted);}
+
+  .endpoint{display:flex;align-items:center;gap:.75rem;margin:1.25rem 0 .5rem;}
+  .method{padding:.25rem .6rem;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:.72rem;font-weight:600;}
+  .post{background:rgba(0,212,170,0.15);color:var(--teal);}
+  .get{background:rgba(121,184,255,0.15);color:#79b8ff;}
+  .path{font-family:'JetBrains Mono',monospace;font-size:.88rem;}
+
+  .badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.7rem;font-family:'JetBrains Mono',monospace;}
+  .protected{background:rgba(255,209,102,0.1);color:var(--yellow);}
+  .public{background:rgba(0,212,170,0.1);color:var(--teal);}
+
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.82rem;}
+  th{text-align:left;padding:.6rem .75rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-weight:400;}
+  td{padding:.65rem .75rem;border-bottom:1px solid rgba(26,42,69,0.5);font-family:'JetBrains Mono',monospace;color:rgba(226,234,247,0.8);}
+  td:first-child{color:var(--teal);}
+
+  .callout{background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:8px;padding:1rem 1.25rem;margin:1rem 0;font-size:.85rem;color:rgba(226,234,247,0.8);}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-icon">🛡</div>
+  <div class="logo-text">Prompt<span>Shield</span> <span style="color:var(--muted);font-weight:400;font-size:.85rem;">/ Docs</span></div>
+</header>
+
+<div class="layout">
+<nav>
+  <div class="nav-group">Getting Started</div>
+  <a href="#intro">Introduction</a>
+  <a href="#auth">Authentication</a>
+  <a href="#quickstart">Quickstart</a>
+  <div class="nav-group">Endpoints</div>
+  <a href="#chat">POST /chat</a>
+  <a href="#analyze">POST /analyze</a>
+  <a href="#aggression">POST /aggression</a>
+  <a href="#stats">GET /stats</a>
+  <a href="#logs">GET /logs</a>
+  <div class="nav-group">SDK</div>
+  <a href="#python-sdk">Python SDK</a>
+  <a href="#js-sdk">JavaScript</a>
+  <div class="nav-group">Reference</div>
+  <a href="#errors">Error Codes</a>
+  <a href="#aggression-levels">Aggression Levels</a>
+</nav>
+
+<div class="content">
+  <h1>PromptShield API</h1>
+  <p>4-layer LLM prompt injection defense middleware. Protect your AI applications from jailbreaks, prompt leaking, and instruction overrides.</p>
+
+  <div class="callout">
+    🔗 Base URL: <code>https://prompt-shield.onrender.com</code>
+  </div>
+
+  <h2 id="auth">Authentication</h2>
+  <p>All protected endpoints require an API key passed in the request header.</p>
+  <pre><code>X-API-Key: ps_live_yourkey</code></pre>
+
+  <h2 id="quickstart">Quickstart</h2>
+  <pre><code><span class="comment"># Install requests if needed</span>
+pip install requests
+
+<span class="comment"># Simple chat request</span>
+curl -X POST https://prompt-shield.onrender.com/chat \
+  -H <span class="str">"X-API-Key: ps_live_yourkey"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"message": "Hello!"}'</span></code></pre>
+
+  <h2 id="chat">POST /chat</h2>
+  <div class="endpoint">
+    <span class="method post">POST</span>
+    <span class="path">/chat</span>
+    <span class="badge protected">Protected</span>
+  </div>
+  <p>Send a message through all 4 defense layers to the LLM backend.</p>
+  <h3>Request Body</h3>
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td>message</td><td>string</td><td>Yes</td><td>User message to process</td></tr>
+    <tr><td>session_id</td><td>string</td><td>No</td><td>Optional session identifier</td></tr>
+  </table>
+  <h3>Response</h3>
+  <pre><code>{
+  <span class="str">"response"</span>:         <span class="str">"Hello! How can I help?"</span>,
+  <span class="str">"allowed"</span>:          <span class="kw">true</span>,
+  <span class="str">"blocked_at_layer"</span>: <span class="kw">null</span>,
+  <span class="str">"block_reason"</span>:     <span class="kw">null</span>,
+  <span class="str">"threat_level"</span>:     <span class="str">"safe"</span>,
+  <span class="str">"threat_score"</span>:     0.0,
+  <span class="str">"processing_ms"</span>:    1189.05,
+  <span class="str">"input_modified"</span>:   <span class="kw">false</span>,
+  <span class="str">"layer3_passed"</span>:    <span class="kw">true</span>,
+  <span class="str">"layer4_risk"</span>:      <span class="str">"clean"</span>,
+  <span class="str">"session_id"</span>:       <span class="str">"abc123"</span>,
+  <span class="str">"aggression_level"</span>: <span class="str">"balanced"</span>
+}</code></pre>
+
+  <h2 id="analyze">POST /analyze</h2>
+  <div class="endpoint">
+    <span class="method post">POST</span>
+    <span class="path">/analyze</span>
+    <span class="badge protected">Protected</span>
+  </div>
+  <p>Analyze text for threats without calling the LLM. Fast and lightweight.</p>
+  <pre><code>{
+  <span class="str">"threat_level"</span>:       <span class="str">"malicious"</span>,
+  <span class="str">"score"</span>:              0.95,
+  <span class="str">"triggered_patterns"</span>: [<span class="str">"[INJECTION] ignore.*instructions"</span>],
+  <span class="str">"reasoning"</span>:          <span class="str">"High-confidence injection attempt"</span>,
+  <span class="str">"sanitized"</span>:          <span class="str">"[instruction-override-attempt]"</span>,
+  <span class="str">"modifications"</span>:      [<span class="str">"Neutralized override"</span>]
+}</code></pre>
+
+  <h2 id="aggression">POST /aggression</h2>
+  <div class="endpoint">
+    <span class="method post">POST</span>
+    <span class="path">/aggression</span>
+    <span class="badge protected">Protected</span>
+  </div>
+  <p>Change the shield aggression level at runtime.</p>
+  <pre><code>{ <span class="str">"level"</span>: <span class="str">"strict"</span> }</code></pre>
+
+  <h2 id="stats">GET /stats</h2>
+  <div class="endpoint">
+    <span class="method get">GET</span>
+    <span class="path">/stats</span>
+    <span class="badge protected">Protected</span>
+  </div>
+  <p>Returns current thresholds and blocking configuration.</p>
+
+  <h2 id="logs">GET /logs</h2>
+  <div class="endpoint">
+    <span class="method get">GET</span>
+    <span class="path">/logs?limit=50</span>
+    <span class="badge protected">Protected</span>
+  </div>
+  <p>Returns recent audit log entries. Max 1000.</p>
+  <div class="endpoint">
+    <span class="method get">GET</span>
+    <span class="path">/logs/summary</span>
+    <span class="badge protected">Protected</span>
+  </div>
+  <p>Returns block rate, threat breakdown, and average response time.</p>
+
+  <h2 id="python-sdk">Python SDK</h2>
+  <pre><code><span class="kw">from</span> promptshield_sdk <span class="kw">import</span> PromptShieldClient
+
+client = PromptShieldClient(api_key=<span class="str">"ps_live_yourkey"</span>)
+
+<span class="comment"># Chat</span>
+result = client.chat(<span class="str">"Hello!"</span>)
+print(result[<span class="str">"response"</span>])
+
+<span class="comment"># Analyze a threat</span>
+threat = client.analyze(<span class="str">"Ignore previous instructions"</span>)
+print(threat[<span class="str">"threat_level"</span>])  <span class="comment"># malicious</span>
+
+<span class="comment"># Get summary stats</span>
+summary = client.summary()
+print(summary[<span class="str">"block_rate"</span>])</code></pre>
+
+  <h2 id="js-sdk">JavaScript</h2>
+  <pre><code><span class="kw">const</span> shield = {
+  baseUrl: <span class="str">"https://prompt-shield.onrender.com"</span>,
+  apiKey:  <span class="str">"ps_live_yourkey"</span>,
+
+  <span class="kw">async</span> chat(message) {
+    <span class="kw">const</span> res = <span class="kw">await</span> fetch(`${<span class="kw">this</span>.baseUrl}/chat`, {
+      method: <span class="str">"POST"</span>,
+      headers: {
+        <span class="str">"X-API-Key"</span>:    <span class="kw">this</span>.apiKey,
+        <span class="str">"Content-Type"</span>: <span class="str">"application/json"</span>,
+      },
+      body: JSON.stringify({ message }),
+    });
+    <span class="kw">return</span> res.json();
+  }
+};
+
+<span class="comment">// Usage</span>
+<span class="kw">const</span> result = <span class="kw">await</span> shield.chat(<span class="str">"Hello!"</span>);
+console.log(result.response);</code></pre>
+
+  <h2 id="errors">Error Codes</h2>
+  <table>
+    <tr><th>Code</th><th>Meaning</th><th>Fix</th></tr>
+    <tr><td>401</td><td>Missing API key</td><td>Add X-API-Key header</td></tr>
+    <tr><td>403</td><td>Invalid API key</td><td>Check your key value</td></tr>
+    <tr><td>429</td><td>Rate limit exceeded</td><td>Wait and retry — check Retry-After header</td></tr>
+    <tr><td>500</td><td>Server error</td><td>Check /health endpoint</td></tr>
+  </table>
+
+  <h2 id="aggression-levels">Aggression Levels</h2>
+  <table>
+    <tr><th>Level</th><th>Behavior</th><th>Use Case</th></tr>
+    <tr><td>permissive</td><td>Log only, rarely block</td><td>Low-risk apps, dev/testing</td></tr>
+    <tr><td>balanced</td><td>Block malicious only</td><td>Default — most apps</td></tr>
+    <tr><td>strict</td><td>Block malicious + suspicious</td><td>Sensitive data apps</td></tr>
+    <tr><td>paranoid</td><td>Block anything above low threshold</td><td>Maximum security</td></tr>
+  </table>
+</div>
+</div>
+</body>
+</html>
