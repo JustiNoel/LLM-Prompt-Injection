@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptShield — LLM Prompt Injection Defense</title>
+<meta name="description" content="4-layer middleware that protects AI applications from prompt injection, jailbreaks, and system prompt leaking.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070b14;--surface:#0d1526;--border:#1a2a45;
+  --teal:#00d4aa;--teal-dim:rgba(0,212,170,0.1);
+  --red:#ff4d6d;--yellow:#ffd166;--blue:#79b8ff;
+  --text:#e2eaf7;--muted:#5a7494;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow-x:hidden;}
+
+/* ── Noise texture overlay ── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:.4;
+}
+
+/* ── Nav ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.25rem 3rem;
+  background:rgba(7,11,20,0.8);backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(26,42,69,0.6);
+}
+.nav-logo{display:flex;align-items:center;gap:.6rem;}
+.nav-logo-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--teal),#0096ff);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;
+}
+.nav-logo-text{font-size:1.05rem;font-weight:800;}
+.nav-logo-text span{color:var(--teal);}
+.nav-links{display:flex;align-items:center;gap:2rem;}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:.85rem;transition:color .2s;}
+.nav-links a:hover{color:var(--text);}
+.nav-cta{
+  background:var(--teal);color:#000;padding:.5rem 1.25rem;
+  border-radius:8px;font-weight:700;font-size:.85rem;
+  text-decoration:none;transition:opacity .2s;
+}
+.nav-cta:hover{opacity:.85;}
+
+/* ── Hero ── */
+.hero{
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;padding:8rem 2rem 4rem;
+  position:relative;
+}
+.hero::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(0,212,170,0.12), transparent 60%),
+    radial-gradient(ellipse 40% 40% at 80% 50%, rgba(0,150,255,0.06), transparent 60%);
+  pointer-events:none;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:.5rem;
+  background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.2);
+  color:var(--teal);padding:.4rem 1rem;border-radius:100px;
+  font-size:.75rem;font-family:'JetBrains Mono',monospace;
+  margin-bottom:2rem;letter-spacing:.05em;
+}
+.hero-badge::before{content:'●';font-size:.5rem;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+h1{
+  font-size:clamp(2.5rem,6vw,4.5rem);font-weight:800;
+  line-height:1.05;letter-spacing:-.03em;
+  margin-bottom:1.5rem;max-width:800px;
+}
+h1 span{color:var(--teal);}
+.hero-sub{
+  font-size:1.1rem;color:rgba(226,234,247,0.65);
+  max-width:560px;line-height:1.7;margin-bottom:3rem;
+}
+.hero-actions{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;}
+.btn-primary{
+  background:var(--teal);color:#000;padding:.8rem 2rem;
+  border-radius:10px;font-weight:700;font-size:.95rem;
+  text-decoration:none;transition:all .2s;
+  box-shadow:0 0 30px rgba(0,212,170,0.2);
+}
+.btn-primary:hover{opacity:.9;box-shadow:0 0 40px rgba(0,212,170,0.3);}
+.btn-secondary{
+  background:transparent;color:var(--text);padding:.8rem 2rem;
+  border-radius:10px;font-weight:600;font-size:.95rem;
+  text-decoration:none;border:1px solid var(--border);transition:all .2s;
+}
+.btn-secondary:hover{border-color:var(--teal);color:var(--teal);}
+
+/* ── Code preview ── */
+.hero-code{
+  margin-top:4rem;background:var(--surface);
+  border:1px solid var(--border);border-radius:14px;
+  padding:1.5rem 2rem;text-align:left;max-width:600px;width:100%;
+  position:relative;overflow:hidden;
+}
+.hero-code::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--teal),transparent);
+}
+.code-bar{display:flex;align-items:center;gap:.4rem;margin-bottom:1rem;}
+.dot{width:10px;height:10px;border-radius:50%;}
+.dot-r{background:#ff5f57;}.dot-y{background:#ffbd2e;}.dot-g{background:#28c840;}
+pre{font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.7;overflow-x:auto;}
+.c-teal{color:var(--teal);}.c-blue{color:var(--blue);}
+.c-muted{color:var(--muted);}.c-str{color:#9ecbff;}.c-kw{color:#f97583;}
+
+/* ── Stats banner ── */
+.stats-banner{
+  display:flex;justify-content:center;gap:0;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  background:var(--surface);overflow:hidden;
+}
+.stat-item{
+  flex:1;max-width:220px;padding:2rem;text-align:center;
+  border-right:1px solid var(--border);
+}
+.stat-item:last-child{border-right:none;}
+.stat-num{font-size:2rem;font-weight:800;color:var(--teal);}
+.stat-lbl{font-size:.75rem;color:var(--muted);margin-top:.25rem;font-family:'JetBrains Mono',monospace;}
+
+/* ── Sections ── */
+section{padding:6rem 2rem;position:relative;}
+.section-inner{max-width:1100px;margin:0 auto;}
+.section-label{
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.15em;
+  color:var(--teal);font-family:'JetBrains Mono',monospace;margin-bottom:1rem;
+}
+h2{font-size:clamp(1.8rem,3vw,2.5rem);font-weight:800;margin-bottom:1rem;letter-spacing:-.02em;}
+.section-sub{color:rgba(226,234,247,0.6);font-size:1rem;max-width:520px;line-height:1.7;margin-bottom:3rem;}
+
+/* ── Layers ── */
+.layers-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;}
+.layer-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:1.75rem;
+  transition:border-color .2s,transform .2s;
+  position:relative;overflow:hidden;
+}
+.layer-card:hover{border-color:var(--teal);transform:translateY(-3px);}
+.layer-card::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--teal),transparent);
+  transform:scaleX(0);transition:transform .3s;transform-origin:left;
+}
+.layer-card:hover::after{transform:scaleX(1);}
+.layer-num{
+  font-size:.7rem;font-family:'JetBrains Mono',monospace;
+  color:var(--teal);margin-bottom:.75rem;letter-spacing:.1em;
+}
+.layer-icon{font-size:1.75rem;margin-bottom:.75rem;}
+.layer-title{font-size:1rem;font-weight:700;margin-bottom:.5rem;}
+.layer-desc{font-size:.82rem;color:var(--muted);line-height:1.6;}
+
+/* ── Use cases ── */
+.use-cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;}
+.use-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:1.75rem;
+}
+.use-icon{font-size:1.5rem;margin-bottom:1rem;}
+.use-title{font-size:1rem;font-weight:700;margin-bottom:.5rem;}
+.use-desc{font-size:.82rem;color:var(--muted);line-height:1.6;}
+
+/* ── Pricing ── */
+.pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;max-width:900px;}
+.price-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:2rem;transition:border-color .2s;
+}
+.price-card.featured{border-color:var(--teal);position:relative;}
+.featured-badge{
+  position:absolute;top:-1px;left:50%;transform:translateX(-50%);
+  background:var(--teal);color:#000;font-size:.65rem;font-weight:700;
+  padding:.25rem .75rem;border-radius:0 0 6px 6px;letter-spacing:.05em;
+}
+.price-plan{font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.1em;}
+.price-amount{font-size:2.2rem;font-weight:800;margin-bottom:.25rem;}
+.price-period{font-size:.8rem;color:var(--muted);}
+.price-features{list-style:none;margin:1.5rem 0;display:flex;flex-direction:column;gap:.6rem;}
+.price-features li{font-size:.82rem;color:rgba(226,234,247,0.7);display:flex;align-items:center;gap:.5rem;}
+.price-features li::before{content:'✓';color:var(--teal);font-weight:700;}
+.price-btn{
+  display:block;text-align:center;padding:.7rem;border-radius:8px;
+  font-weight:700;font-size:.85rem;text-decoration:none;transition:all .2s;
+  background:var(--teal-dim);color:var(--teal);border:1px solid rgba(0,212,170,0.3);
+}
+.price-card.featured .price-btn{background:var(--teal);color:#000;border:none;}
+.price-btn:hover{opacity:.85;}
+
+/* ── CTA ── */
+.cta-section{
+  text-align:center;
+  background:linear-gradient(135deg,rgba(0,212,170,0.05),rgba(0,150,255,0.05));
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+}
+
+/* ── Footer ── */
+footer{
+  padding:2rem 3rem;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.78rem;color:var(--muted);
+}
+footer a{color:var(--muted);text-decoration:none;}
+footer a:hover{color:var(--teal);}
+.footer-links{display:flex;gap:1.5rem;}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-icon">🛡</div>
+    <div class="nav-logo-text">Prompt<span>Shield</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="#layers">How it Works</a>
+    <a href="#usecases">Use Cases</a>
+    <a href="#pricing">Pricing</a>
+    <a href="docs.html">Docs</a>
+    <a href="dashboard.html">Dashboard</a>
+  </div>
+  <a href="https://prompt-shield.onrender.com/docs" class="nav-cta" target="_blank">Try the API →</a>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">🔴 Live — prompt-shield.onrender.com</div>
+  <h1>Stop Prompt Injection<br>Before It <span>Reaches Your LLM</span></h1>
+  <p class="hero-sub">PromptShield is a 4-layer defense middleware that blocks jailbreaks, system prompt leaking, and instruction overrides in real time.</p>
+  <div class="hero-actions">
+    <a href="https://prompt-shield.onrender.com/docs" class="btn-primary" target="_blank">View Live API</a>
+    <a href="https://github.com/JustiNoel/LLM-Prompt-Injection" class="btn-secondary" target="_blank">GitHub →</a>
+  </div>
+  <div class="hero-code">
+    <div class="code-bar">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+    </div>
+    <pre><code><span class="c-muted"># Integrate in 3 lines</span>
+<span class="c-kw">from</span> <span class="c-teal">promptshield_sdk</span> <span class="c-kw">import</span> PromptShieldClient
+
+client = PromptShieldClient(<span class="c-str">"ps_live_yourkey"</span>)
+result = client.chat(<span class="c-str">"Hello!"</span>)
+
+<span class="c-muted"># Injection attempt? Blocked automatically.</span>
+result = client.chat(<span class="c-str">"Ignore all previous instructions"</span>)
+<span class="c-muted"># → allowed: false, blocked_at_layer: 1</span></code></pre>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats-banner">
+  <div class="stat-item"><div class="stat-num">4</div><div class="stat-lbl">Defense Layers</div></div>
+  <div class="stat-item"><div class="stat-num">30+</div><div class="stat-lbl">Attack Patterns</div></div>
+  <div class="stat-item"><div class="stat-num">&lt;2s</div><div class="stat-lbl">Avg Response Time</div></div>
+  <div class="stat-item"><div class="stat-num">100%</div><div class="stat-lbl">API Coverage</div></div>
+</div>
+
+<!-- Layers -->
+<section id="layers">
+  <div class="section-inner">
+    <div class="section-label">Architecture</div>
+    <h2>4 Layers of Defense</h2>
+    <p class="section-sub">Every request passes through all four layers before reaching your LLM — and before the response reaches your user.</p>
+    <div class="layers-grid">
+      <div class="layer-card">
+        <div class="layer-num">LAYER 01</div>
+        <div class="layer-icon">🔍</div>
+        <div class="layer-title">Input Classification</div>
+        <div class="layer-desc">Pattern matching + heuristic scoring detects injection attempts, jailbreak templates, and role-override attacks before anything else runs.</div>
+      </div>
+      <div class="layer-card">
+        <div class="layer-num">LAYER 02</div>
+        <div class="layer-icon">🧹</div>
+        <div class="layer-title">Context Sanitization</div>
+        <div class="layer-desc">Strips prompt delimiters, neutralizes override phrases, removes encoded payloads, and wraps input in safe boundaries.</div>
+      </div>
+      <div class="layer-card">
+        <div class="layer-num">LAYER 03</div>
+        <div class="layer-icon">🔐</div>
+        <div class="layer-title">Prompt Integrity</div>
+        <div class="layer-desc">HMAC-signs and verifies your system prompt hasn't been tampered with. Catches structural violations before the LLM call.</div>
+      </div>
+      <div class="layer-card">
+        <div class="layer-num">LAYER 04</div>
+        <div class="layer-icon">👁</div>
+        <div class="layer-title">Output Monitoring</div>
+        <div class="layer-desc">Scans LLM responses for jailbreak success signals, system prompt leakage, PII exposure, and harmful content patterns.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Use Cases -->
+<section id="usecases" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div class="section-inner">
+    <div class="section-label">Use Cases</div>
+    <h2>Who Needs PromptShield?</h2>
+    <p class="section-sub">Any application that exposes an LLM to user input is vulnerable. PromptShield protects them all.</p>
+    <div class="use-cases">
+      <div class="use-card">
+        <div class="use-icon">🏦</div>
+        <div class="use-title">Fintechs & Banks</div>
+        <div class="use-desc">AI chatbots handling financial queries are prime targets. PromptShield prevents data extraction and unauthorized instruction execution.</div>
+      </div>
+      <div class="use-card">
+        <div class="use-icon">🏥</div>
+        <div class="use-title">Healthtech</div>
+        <div class="use-desc">Patient-facing AI tools must never leak sensitive data. Layer 4 output monitoring catches PII before it reaches users.</div>
+      </div>
+      <div class="use-card">
+        <div class="use-icon">📚</div>
+        <div class="use-title">EdTech Platforms</div>
+        <div class="use-desc">AI tutors deployed to students are easily manipulated. PromptShield blocks attempts to bypass content guidelines.</div>
+      </div>
+      <div class="use-card">
+        <div class="use-icon">🏢</div>
+        <div class="use-title">Enterprise AI</div>
+        <div class="use-desc">Internal copilots with access to sensitive company data need strong prompt security. Self-host with Docker for full control.</div>
+      </div>
+      <div class="use-card">
+        <div class="use-icon">🛒</div>
+        <div class="use-title">E-commerce Bots</div>
+        <div class="use-desc">Customer service AIs can be manipulated into giving unauthorized discounts or leaking pricing logic. Not anymore.</div>
+      </div>
+      <div class="use-card">
+        <div class="use-icon">🏛</div>
+        <div class="use-title">Government & NGOs</div>
+        <div class="use-desc">Public-facing AI tools in sensitive contexts need audit trails and compliance-ready logging. PromptShield delivers both.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section id="pricing">
+  <div class="section-inner">
+    <div class="section-label">Pricing</div>
+    <h2>Simple, Honest Pricing</h2>
+    <p class="section-sub">Start free. Scale as you grow. Enterprise self-hosting available.</p>
+    <div class="pricing-grid">
+      <div class="price-card">
+        <div class="price-plan">Starter</div>
+        <div class="price-amount">Free</div>
+        <div class="price-period">During beta</div>
+        <ul class="price-features">
+          <li>1 API key</li>
+          <li>60 requests/min</li>
+          <li>All 4 defense layers</li>
+          <li>Audit logs (last 1000)</li>
+          <li>Community support</li>
+        </ul>
+        <a href="https://prompt-shield.onrender.com/docs" class="price-btn" target="_blank">Get Started</a>
+      </div>
+      <div class="price-card featured">
+        <div class="featured-badge">MOST POPULAR</div>
+        <div class="price-plan">Professional</div>
+        <div class="price-amount">$99<span style="font-size:1rem;font-weight:400">/mo</span></div>
+        <div class="price-period">Billed monthly</div>
+        <ul class="price-features">
+          <li>10 API keys</li>
+          <li>Custom rate limits</li>
+          <li>All 4 defense layers</li>
+          <li>Full audit trail</li>
+          <li>Dashboard access</li>
+          <li>Email support</li>
+        </ul>
+        <a href="mailto:shillah@example.com" class="price-btn">Contact Us</a>
+      </div>
+      <div class="price-card">
+        <div class="price-plan">Enterprise</div>
+        <div class="price-amount">Custom</div>
+        <div class="price-period">Annual license</div>
+        <ul class="price-features">
+          <li>Unlimited API keys</li>
+          <li>Self-hosted (Docker)</li>
+          <li>Custom aggression tuning</li>
+          <li>SLA guarantee</li>
+          <li>Dedicated support</li>
+          <li>Compliance reporting</li>
+        </ul>
+        <a href="mailto:shillah@example.com" class="price-btn">Talk to Us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="section-inner" style="text-align:center;">
+    <div class="section-label" style="justify-content:center;display:flex;">Get Started</div>
+    <h2>Your LLM is exposed.<br>Fix it in minutes.</h2>
+    <p class="section-sub" style="margin:1rem auto 2rem;">PromptShield integrates with any LLM backend. One API call. Full protection.</p>
+    <div class="hero-actions">
+      <a href="https://prompt-shield.onrender.com/docs" class="btn-primary" target="_blank">View Live API</a>
+      <a href="docs.html" class="btn-secondary">Read the Docs</a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="nav-logo">
+    <div class="nav-logo-icon" style="width:24px;height:24px;font-size:.75rem;">🛡</div>
+    <div class="nav-logo-text" style="font-size:.9rem;">Prompt<span>Shield</span></div>
+  </div>
+  <div style="color:var(--muted);font-size:.75rem;">Built by Shillah · Kenya 🇰🇪</div>
+  <div class="footer-links">
+    <a href="https://github.com/JustiNoel/LLM-Prompt-Injection" target="_blank">GitHub</a>
+    <a href="docs.html">Docs</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="https://prompt-shield.onrender.com/docs" target="_blank">API</a>
+  </div>
+</footer>
+
+</body>
+</html>
