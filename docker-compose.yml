@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  promptshield:
+    build: ./prompt-shield
+    container_name: promptshield
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./prompt-shield/.env
+    environment:
+      - SHIELD_AGGRESSION=balanced
+      - RATE_LIMIT_REQUESTS=60
+      - RATE_LIMIT_WINDOW_SECONDS=60
+      - AUDIT_MAX_MEMORY=1000
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
