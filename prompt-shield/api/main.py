@@ -279,3 +279,21 @@ async def logs_summary(
     _auth: str = Depends(require_api_key),
 ):
     return get_summary()
+
+
+# ── Frontend Page Routes ──────────────────────────────────────
+@app.get("/dashboard.html", tags=["Public"])
+async def dashboard():
+    return FileResponse("frontend/dashboard.html")
+
+@app.get("/docs.html", tags=["Public"])
+async def docs_page():
+    return FileResponse("frontend/docs.html")
+
+@app.get("/index.html", tags=["Public"])
+async def index():
+    return FileResponse("frontend/index.html")
+
+@app.get("/landing.html", tags=["Public"])
+async def landing():
+    return FileResponse("frontend/landing.html")
