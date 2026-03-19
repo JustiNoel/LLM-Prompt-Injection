@@ -288,4 +288,4 @@ Any developer building LLM-powered applications can drop PromptShield in as midd
 
 ## 📄 License
 
-MIT — Built for the hackathon. Use freely.
+MIT — Built for LLM built in Institution.
