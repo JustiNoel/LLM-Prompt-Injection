@@ -22,7 +22,7 @@ from middleware.shield import AggressionLevel
 sys.path.insert(0, os.path.dirname(__file__))
 from auth import require_api_key
 from rate_limiter import check_rate_limit
-from audit import log_request, get_recent_logs, get_summary
+from audit import log_request, get_recent_logs, get_summary  # ← NEW
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("prompt_shield.api")
@@ -44,6 +44,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Serve frontend static files ───────────────────────────────
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 SYSTEM_PROMPT = """You are a helpful AI assistant called PromptShield Demo.
@@ -122,6 +123,7 @@ class AggressionRequest(BaseModel):
     level: str
 
 
+# ── Public Routes ─────────────────────────────────────────────
 @app.get("/", tags=["Public"])
 async def root():
     return FileResponse("frontend/landing.html")
@@ -138,6 +140,7 @@ async def health():
     }
 
 
+# ── Protected Routes ──────────────────────────────────────────
 @app.post("/chat", response_model=ChatResponse, tags=["Protected"])
 async def chat(
     req: ChatRequest,
@@ -151,6 +154,7 @@ async def chat(
         system_prompt_name="default",
         session_id=req.session_id,
     )
+    # ── Audit log ──
     log_request(
         session_id=result.session_id,
         api_key=api_key,
@@ -263,11 +267,13 @@ async def stats(
     }
 
 
+# ── Audit Routes ──────────────────────────────────────────────
 @app.get("/logs", tags=["Audit"])
 async def get_logs(
     limit: int = Query(default=50, le=1000),
     _auth: str = Depends(require_api_key),
 ):
+    """View recent request audit trail."""
     return {
         "logs": get_recent_logs(limit=limit),
         "count": limit,
@@ -278,4 +284,5 @@ async def get_logs(
 async def logs_summary(
     _auth: str = Depends(require_api_key),
 ):
+    """Summary stats — total requests, block rate, threat breakdown."""
     return get_summary()
